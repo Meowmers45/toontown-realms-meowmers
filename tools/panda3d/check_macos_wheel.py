@@ -21,7 +21,7 @@ with ZipFile(wheel) as archive, TemporaryDirectory() as temp:
         description = subprocess.check_output(['file', '-b', str(path)], text=True)
         if 'Mach-O' not in description:
             continue
-        subprocess.run(['lipo', '-verify_arch', arch, str(path)], check=True)
+        subprocess.run(['lipo', str(path), '-verify_arch', arch], check=True)
         commands = subprocess.check_output(['otool', '-arch', arch, '-l', str(path)], text=True)
         minimums = re.findall(
             r'cmd LC_BUILD_VERSION\s+cmdsize \d+\s+platform (?:1|macos)\s+minos ([\d.]+)'
