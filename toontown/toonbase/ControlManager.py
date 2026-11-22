@@ -23,6 +23,7 @@ class ControlManager(DirectObject):
     def __init__(self):
         DirectObject.__init__(self)
         self.changing = False
+        self.marioHotkeys = False
         self.disableChat = 1
         self.disabledHotkeys = []
         self.activeHotkeys = []
@@ -47,6 +48,8 @@ class ControlManager(DirectObject):
         allKeys: List[Type[HotkeySetting]] = HotkeySettings.getAllHotkeys()
 
         for key in allKeys:
+            if key.category == HotkeySettings.SettingsCategory.HOTKEY_MARIO and not self.marioHotkeys:
+                continue
             boundKey = key.get()
             isAlphaNumeric: bool = self.isAlphaNumericHotkey(boundKey)
             if disableChat and isAlphaNumeric:
@@ -60,6 +63,11 @@ class ControlManager(DirectObject):
         self.activeHotkeys = activeHotkeys
         if hasattr(base, 'localAvatar') and hasattr(base.localAvatar, 'chatMgr') and base.localAvatar.chatMgr:
             base.localAvatar.chatMgr.setBackgroundFocus(disableChat, realtime)
+
+    def setMarioHotkeys(self, enabled):
+        if self.marioHotkeys != enabled:
+            self.marioHotkeys = enabled
+            self.reloadHotkeys()
 
     def dispatchHotkeys(self, boundKey, keys, released):
         for key in keys:

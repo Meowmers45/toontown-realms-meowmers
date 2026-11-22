@@ -25,6 +25,7 @@ class MarioMode:
         self.toonModel.hide()
         self.elapsed = 0
         self.toon.controlManager.setMarioControls(True)
+        base.controlManager.setMarioHotkeys(True)
         self.task = taskMgr.add(self.update, toon.uniqueName('mario-pose'), sort=48)
 
     def update(self, task):
@@ -56,6 +57,7 @@ class MarioMode:
     def close(self):
         self.task.remove()
         self.toon.controlManager.setMarioControls(False)
+        base.controlManager.setMarioHotkeys(False)
         self.model.close()
         if not self.toonModel.isEmpty() and not self.wasHidden:
             self.toonModel.show()
