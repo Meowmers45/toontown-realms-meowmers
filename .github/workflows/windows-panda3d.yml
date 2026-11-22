@@ -32,7 +32,7 @@ jobs:
           Expand-Archive -Path $archive -DestinationPath $env:RUNNER_TEMP
           Move-Item (Join-Path $env:RUNNER_TEMP 'panda3d-1.10.16/thirdparty') ./
 
-      - name: Remove the obsolete Toontown linker input
+      - name: Apply compatibility fixes to the pinned fork
         shell: pwsh
         run: |
           # This fork already links the current Panda libraries through COMMON_PANDA_LIBS.
@@ -43,6 +43,17 @@ jobs:
             throw 'Expected exactly one obsolete Toontown linker input.'
           }
           [System.IO.File]::WriteAllLines($makepanda, [string[]]($lines | Where-Object { $_ -cne $obsolete }))
+
+          # MSVC's C++17 standard library removed random_shuffle.
+          $margin = (Resolve-Path 'panda/src/toontown/marginManager.cxx').Path
+          $source = [System.IO.File]::ReadAllText($margin)
+          $old = 'random_shuffle(empty_cells.begin(), empty_cells.end());'
+          if ([regex]::Matches($source, [regex]::Escape($old)).Count -ne 2) {
+            throw 'Expected exactly two legacy margin cell shuffles.'
+          }
+          $source = $source.Replace('#include <algorithm>', "#include <algorithm>`n#include <cstdlib>`n#include <random>")
+          $source = $source.Replace($old, 'std::shuffle(empty_cells.begin(), empty_cells.end(), std::mt19937(std::rand()));')
+          [System.IO.File]::WriteAllText($margin, $source)
 
       - name: Build the Python 3.12 x64 wheel
         shell: pwsh
