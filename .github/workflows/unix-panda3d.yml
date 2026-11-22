@@ -1,0 +1,85 @@
+name: Build Toontown Panda3D for Linux and macOS
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/unix-panda3d.yml'
+      - 'tools/panda3d/**'
+
+permissions:
+  contents: read
+
+jobs:
+  wheel:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            artifact: linux-x86_64
+          - runner: macos-15-intel
+            artifact: macos-11-x86_64
+          - runner: macos-15
+            artifact: macos-11-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check out the pinned Panda3D fork
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Meowmers45/panda3d-ttoff-Meowmers
+          ref: 2d20af7f7f46a7cd316f6dc165f3dc0dc984372b
+          persist-credentials: false
+          path: panda-source
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        if: runner.os == 'Linux'
+        with:
+          python-version: '3.12'
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bison flex patchelf libgl1-mesa-dev libx11-dev libxrandr-dev \
+            libjpeg-dev libpng-dev zlib1g-dev libfreetype-dev libopenal-dev libvorbis-dev libode-dev
+
+      - name: Install macOS build dependencies and Python framework
+        if: runner.os == 'macOS'
+        run: |
+          curl -fLsS --retry 3 https://www.panda3d.org/download/panda3d-1.10.16/panda3d-1.10.16-tools-mac.tar.gz -o "$RUNNER_TEMP/panda-tools.tar.gz"
+          curl -fLsS --retry 3 https://www.python.org/ftp/python/3.12.10/python-3.12.10-macos11.pkg -o "$RUNNER_TEMP/python.pkg"
+          cd "$RUNNER_TEMP"
+          echo 'b56176be39a160d65653b13489d786808f5357896013d95dca8e3ea55f1858c9  panda-tools.tar.gz' | shasum -a 256 -c
+          echo '8373e58da4ea146b3eb1c1f9834f19a319440b6b679b06050b1f9ee3237aa8e4  python.pkg' | shasum -a 256 -c
+          tar xf panda-tools.tar.gz
+          mv panda3d-1.10.16/thirdparty "$GITHUB_WORKSPACE/panda-source/"
+          sudo installer -pkg python.pkg -target /
+          echo '/Library/Frameworks/Python.framework/Versions/3.12/bin' >> "$GITHUB_PATH"
+
+      - name: Build the wheel
+        run: |
+          python3.12 tools/panda3d/patch_unix_build.py panda-source
+          cd panda-source
+          python3.12 makepanda/makepanda.py --wheel --everything --optimize=3 --no-eigen \
+            --no-nvidiacg --no-fmodex --no-openexr --threads=3
+
+      - name: Check macOS architecture and deployment targets
+        if: runner.os == 'macOS'
+        run: python3.12 tools/panda3d/check_macos_wheel.py panda-source/*.whl "$(uname -m)"
+
+      - name: Install and test Toontown runtime modules
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/wheel-test"
+          "$RUNNER_TEMP/wheel-test/bin/python" -m pip install panda-source/*.whl
+          "$RUNNER_TEMP/wheel-test/bin/python" -c "from panda3d.toontown import DNAStorage, Nametag; from panda3d import ode; from direct import discord_rpc"
+
+      - name: Upload the verified wheel
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: panda3d-ttoff-${{ matrix.artifact }}-cp312
+          path: panda-source/*.whl
+          if-no-files-found: error
