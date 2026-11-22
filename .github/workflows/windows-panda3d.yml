@@ -13,18 +13,17 @@ jobs:
   wheel:
     runs-on: windows-2022
     steps:
+      - name: Check out the Panda3D fork
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Meowmers45/panda3d-ttoff-Meowmers
+          ref: 2d20af7f7f46a7cd316f6dc165f3dc0dc984372b
+          persist-credentials: false
+
       - name: Check out the game launcher
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: game-source
-          persist-credentials: false
-
-      - name: Check out the Panda3D fork
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          clean: false
-          repository: Meowmers45/panda3d-ttoff-Meowmers
-          ref: 2d20af7f7f46a7cd316f6dc165f3dc0dc984372b
           persist-credentials: false
 
       - name: Install Panda3D build dependencies
@@ -153,3 +152,44 @@ jobs:
           name: panda3d-ttoff-windows-x64-cp312
           path: '*.whl'
           if-no-files-found: error
+
+  launcher:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Test launcher interpreter selection
+        shell: pwsh
+        run: |
+          $fixture = Join-Path $env:RUNNER_TEMP 'launcher-fixture'
+          $local = Join-Path $env:RUNNER_TEMP 'launcher-local'
+          $destination = Join-Path $local 'Panda3D-TTRMDev-1.11.0-x64/python'
+          New-Item -ItemType Directory -Force -Path (Join-Path $fixture 'win32'), (Join-Path $fixture 'toontown/launcher'), $destination | Out-Null
+          Copy-Item 'win32/start_game.bat' (Join-Path $fixture 'win32/start_game.bat')
+          Copy-Item (Join-Path $env:pythonLocation '*') $destination -Recurse -Force
+          Copy-Item (Join-Path $destination 'python.exe') (Join-Path $destination 'ppython.exe')
+          Set-Content (Join-Path $fixture 'toontown/launcher/ToontownOfflineQuickStartLauncher.py') "import os; assert os.environ['TTOFF_PLAY_TOKEN'] == 'dev'; assert os.environ['TTOFF_GAME_MODE'] == '0'; open('launch-ok', 'w').close()"
+          Set-Content (Join-Path $fixture 'PPYTHON_PATH') '"C:\missing\ppython.exe"'
+          $env:LOCALAPPDATA = $local
+          Push-Location (Join-Path $fixture 'win32')
+          try {
+            cmd /c "start_game.bat < NUL"
+            $marker = Join-Path $fixture 'launch-ok'
+            if (!(Test-Path $marker)) { throw 'Game launcher did not use the installer fallback.' }
+            Remove-Item $marker
+            Set-Content (Join-Path $fixture 'PPYTHON_PATH') ('"' + (Join-Path $destination 'ppython.exe') + '"')
+            $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'no-panda-installed'
+            cmd /c "start_game.bat < NUL"
+            if (!(Test-Path $marker)) { throw 'Game launcher did not use its configured interpreter.' }
+            Remove-Item $marker
+            Set-Content (Join-Path $fixture 'PPYTHON_PATH') '"C:\missing\ppython.exe"'
+            cmd /c "start_game.bat < NUL"
+            if ($LASTEXITCODE -ne 1 -or (Test-Path $marker)) { throw 'Missing Panda3D was not reported.' }
+          } finally {
+            Pop-Location
+          }
