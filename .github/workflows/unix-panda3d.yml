@@ -63,6 +63,10 @@ jobs:
       - name: Build the wheel
         run: |
           python3.12 tools/panda3d/patch_unix_build.py panda-source
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            # Apple libc++'s shuffle exceeds makepanda's default template depth of 70.
+            export CXXFLAGS="${CXXFLAGS:+$CXXFLAGS }-ftemplate-depth=256"
+          fi
           cd panda-source
           python3.12 makepanda/makepanda.py --wheel --everything --optimize=3 --no-eigen \
             --no-nvidiacg --no-fmodex --no-openexr --threads=3
