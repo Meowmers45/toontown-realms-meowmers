@@ -13,25 +13,25 @@ Mario mode is optional. It uses your local Toon's collision body, movement, inte
 
 The default Mario keys are the arrow keys for movement, **J** for jump, **K** for punch, and **L** for crouch. Change them under **Settings > Game > Mario Controls**. The usual interaction keys still work.
 
-## Windows Panda3D
-
-The [Windows Panda3D workflow](../.github/workflows/windows-panda3d.yml) builds an x64 Python 3.12 wheel from the [Meowmers Panda3D fork](https://github.com/Meowmers45/panda3d-ttoff-Meowmers). Download and extract its artifact from the workflow run after it passes. Install the wheel and the game's requirements using the same Python installation:
-
 <!-- coderabbit-ai-generated:v1 -->
 
-<!-- coderabbit-ai-generated-section:v1:d5b67b1c17845ec7a8245effdc0db18b9242f525568dbb3fdc210367f07c7888 -->
+<!-- coderabbit-ai-generated-section:v1:8771dac91c14a29f73b3d3ceefb0184273a28e1cf6799f0911929fae3ef20a47 -->
 
-```powershell
-py -3.12 -m pip install ".\panda3d-<version>-cp312-cp312-win_amd64.whl"
-py -3.12 -m pip install -r requirements.txt
-$env:TTOFF_PLAY_TOKEN = 'dev'
-$env:TTOFF_GAME_MODE = '0'
-py -3.12 -m toontown.launcher.ToontownOfflineQuickStartLauncher
+## Windows Panda3D
+
+The [Windows build](../.github/workflows/windows-panda3d.yml) produces an x64 Panda3D installer for Windows 11, including the Lenovo Legion Go. Open the **panda3d-ttoff-windows-x64-installer** artifact from a successful run and run the installer. It includes Python 3.12 and defaults to `%LOCALAPPDATA%\Panda3D-TTRMDev-1.11.0-x64`.
+
+In the game checkout, run the following to install the game's Python dependency:
+
+```bat
+"%LOCALAPPDATA%\Panda3D-TTRMDev-1.11.0-x64\python\ppython.exe" -m pip install -r requirements.txt
 ```
 
-<!-- /coderabbit-ai-generated:v1 -->
+Then run `win32\start_game.bat` from its directory. The launcher uses a valid `PPYTHON_PATH` first and otherwise finds the per-user installation. If you install Panda3D somewhere else, put the full path to its `python\ppython.exe` in `PPYTHON_PATH`.
 
-Replace the wheel name with the downloaded file name. Alternatively, point the local `PPYTHON_PATH` file at that Python executable and use `win32/start_game.bat`.
+The Lenovo Legion Go has a touch screen, touchpad, and detachable controllers. The game's existing controls are keyboard and mouse bindings; the installer does not configure controller mappings.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Credits
 

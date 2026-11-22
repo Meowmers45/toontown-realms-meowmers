@@ -13,9 +13,16 @@ jobs:
   wheel:
     runs-on: windows-2022
     steps:
+      - name: Check out the game launcher
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: game-source
+          persist-credentials: false
+
       - name: Check out the Panda3D fork
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          clean: false
           repository: Meowmers45/panda3d-ttoff-Meowmers
           ref: 2d20af7f7f46a7cd316f6dc165f3dc0dc984372b
           persist-credentials: false
@@ -101,6 +108,37 @@ jobs:
           $env:PYTHONPATH = $null
           & $python -c "import struct; assert struct.calcsize('P') == 8; from panda3d.toontown import DNAStorage, Nametag; from panda3d import ode; from direct import discord_rpc; print('x64 Panda3D installer verified')"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify the game launcher's installer fallback
+        shell: pwsh
+        run: |
+          $fixture = Join-Path $env:RUNNER_TEMP 'launcher-fixture'
+          $local = Join-Path $env:RUNNER_TEMP 'launcher-local'
+          $source = Join-Path $env:RUNNER_TEMP 'Panda3D-Installer-Test'
+          $destination = Join-Path $local 'Panda3D-TTRMDev-1.11.0-x64'
+          New-Item -ItemType Directory -Force -Path (Join-Path $fixture 'win32'), (Join-Path $fixture 'toontown/launcher'), $local | Out-Null
+          Move-Item $source $destination
+          Copy-Item 'game-source/win32/start_game.bat' (Join-Path $fixture 'win32/start_game.bat')
+          Set-Content (Join-Path $fixture 'PPYTHON_PATH') '"C:\missing\ppython.exe"'
+          Set-Content (Join-Path $fixture 'toontown/launcher/ToontownOfflineQuickStartLauncher.py') "import os; assert os.environ['TTOFF_PLAY_TOKEN'] == 'dev'; assert os.environ['TTOFF_GAME_MODE'] == '0'; open('launch-ok', 'w').close()"
+          $env:LOCALAPPDATA = $local
+          Push-Location (Join-Path $fixture 'win32')
+          try {
+            cmd /c "start_game.bat < NUL"
+            $marker = Join-Path $fixture 'launch-ok'
+            if (!(Test-Path $marker)) { throw 'Game launcher did not use the installer fallback.' }
+            Remove-Item $marker
+            Set-Content (Join-Path $fixture 'PPYTHON_PATH') ('"' + (Join-Path $destination 'python/ppython.exe') + '"')
+            $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'no-panda-installed'
+            cmd /c "start_game.bat < NUL"
+            if (!(Test-Path $marker)) { throw 'Game launcher did not use its configured interpreter.' }
+            Remove-Item $marker
+            Set-Content (Join-Path $fixture 'PPYTHON_PATH') '"C:\missing\ppython.exe"'
+            cmd /c "start_game.bat < NUL"
+            if ($LASTEXITCODE -ne 1 -or (Test-Path $marker)) { throw 'Missing Panda3D was not reported.' }
+          } finally {
+            Pop-Location
+          }
 
       - name: Upload the verified Windows x64 installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
