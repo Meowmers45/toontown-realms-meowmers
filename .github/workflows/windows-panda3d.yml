@@ -135,6 +135,7 @@ jobs:
             Set-Content (Join-Path $fixture 'PPYTHON_PATH') '"C:\missing\ppython.exe"'
             cmd /c "start_game.bat < NUL"
             if ($LASTEXITCODE -ne 1 -or (Test-Path $marker)) { throw 'Missing Panda3D was not reported.' }
+            $global:LASTEXITCODE = 0
           } finally {
             Pop-Location
           }
@@ -190,6 +191,7 @@ jobs:
             Set-Content (Join-Path $fixture 'PPYTHON_PATH') '"C:\missing\ppython.exe"'
             cmd /c "start_game.bat < NUL"
             if ($LASTEXITCODE -ne 1 -or (Test-Path $marker)) { throw 'Missing Panda3D was not reported.' }
+            $global:LASTEXITCODE = 0
           } finally {
             Pop-Location
           }

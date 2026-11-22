@@ -8,7 +8,7 @@ if exist PPYTHON_PATH set /P PPYTHON_PATH=<PPYTHON_PATH
 set "PPYTHON_PATH=%PPYTHON_PATH:"=%"
 if defined PPYTHON_PATH (
     if exist "%PPYTHON_PATH%" goto startGame
-    where /Q "%PPYTHON_PATH%"
+    where /Q "%PPYTHON_PATH%" 2>nul
     if not errorlevel 1 goto startGame
 )
 set "PPYTHON_PATH=%LOCALAPPDATA%\Panda3D-TTRMDev-1.11.0-x64\python\ppython.exe"
