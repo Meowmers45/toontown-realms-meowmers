@@ -55,10 +55,22 @@ jobs:
           $source = $source.Replace($old, 'std::shuffle(empty_cells.begin(), empty_cells.end(), std::mt19937(std::rand()));')
           [System.IO.File]::WriteAllText($margin, $source)
 
-      - name: Build the Python 3.12 x64 wheel
+      - name: Use a per-user default installation directory
         shell: pwsh
         run: |
-          & ./thirdparty/win-python3.12-x64/python.exe makepanda/makepanda.py --wheel --everything --msvc-version=14.3 --windows-sdk=10 --arch=x64 --no-eigen --no-tinydisplay --no-openexr --no-squish --threads=4
+          $package = (Resolve-Path 'makepanda/makepackage.py').Path
+          $source = [System.IO.File]::ReadAllText($package)
+          $old = 'dir = "C:\\Panda3D-TTRMDev-" + version'
+          $new = 'dir = "$LOCALAPPDATA\\Panda3D-TTRMDev-" + version'
+          if (($source.Split(@($old), [StringSplitOptions]::None).Length - 1) -ne 1) {
+            throw 'Expected exactly one default Panda3D installation directory.'
+          }
+          [System.IO.File]::WriteAllText($package, $source.Replace($old, $new))
+
+      - name: Build the x64 installer and Python 3.12 wheel
+        shell: pwsh
+        run: |
+          & ./thirdparty/win-python3.12-x64/python.exe makepanda/makepanda.py --installer --wheel --everything --msvc-version=14.3 --windows-sdk=10 --arch=x64 --no-eigen --no-tinydisplay --no-openexr --no-squish --threads=4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -74,6 +86,28 @@ jobs:
           python -m pip install $wheel.FullName
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -c "from panda3d.toontown import DNAStorage, Nametag; from direct import discord_rpc"
+
+      - name: Install and verify the x64 installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path . -Filter 'Panda3D-TTRMDev-*-x64.exe'
+          if (@($installer).Count -ne 1) { throw 'Expected one Panda3D x64 installer.' }
+          $destination = Join-Path $env:RUNNER_TEMP 'Panda3D-Installer-Test'
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$destination" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed with exit code $($process.ExitCode)." }
+          $python = Join-Path $destination 'python/ppython.exe'
+          if (!(Test-Path $python)) { throw 'Installer did not include ppython.exe.' }
+          if (!(Test-Path (Join-Path $destination 'bin/libpandagl.dll'))) { throw 'OpenGL renderer missing.' }
+          $env:PYTHONPATH = $null
+          & $python -c "import struct; assert struct.calcsize('P') == 8; from panda3d.toontown import DNAStorage, Nametag; from panda3d import ode; from direct import discord_rpc; print('x64 Panda3D installer verified')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload the verified Windows x64 installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: panda3d-ttoff-windows-x64-installer
+          path: 'Panda3D-TTRMDev-*-x64.exe'
+          if-no-files-found: error
 
       - name: Upload the verified wheel
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
