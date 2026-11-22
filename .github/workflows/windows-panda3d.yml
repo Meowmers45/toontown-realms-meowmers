@@ -32,6 +32,18 @@ jobs:
           Expand-Archive -Path $archive -DestinationPath $env:RUNNER_TEMP
           Move-Item (Join-Path $env:RUNNER_TEMP 'panda3d-1.10.16/thirdparty') ./
 
+      - name: Remove the obsolete Toontown linker input
+        shell: pwsh
+        run: |
+          # This fork already links the current Panda libraries through COMMON_PANDA_LIBS.
+          $makepanda = (Resolve-Path 'makepanda/makepanda.py').Path
+          $obsolete = "    PyTargetAdd('toontown.pyd', input='libp3interrogatedb.dll')"
+          $lines = [System.IO.File]::ReadAllLines($makepanda)
+          if (@($lines | Where-Object { $_ -ceq $obsolete }).Count -ne 1) {
+            throw 'Expected exactly one obsolete Toontown linker input.'
+          }
+          [System.IO.File]::WriteAllLines($makepanda, [string[]]($lines | Where-Object { $_ -cne $obsolete }))
+
       - name: Build the Python 3.12 x64 wheel
         shell: pwsh
         run: |
