@@ -60,7 +60,21 @@ jobs:
           sudo installer -pkg python.pkg -target /
           echo '/Library/Frameworks/Python.framework/Versions/3.12/bin' >> "$GITHUB_PATH"
 
+      - name: Identify build environment
+        id: build_env
+        if: runner.os == 'macOS'
+        run: echo "image=${ImageVersion:?Missing runner image version}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore macOS wheel cache
+        id: wheel_cache
+        if: runner.os == 'macOS'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: panda-source/*.whl
+          key: panda-mac-v1-${{ matrix.artifact }}-${{ steps.build_env.outputs.image }}-${{ hashFiles('tools/panda3d/patch_unix_build.py') }}
+
       - name: Build the wheel
+        if: runner.os != 'macOS' || steps.wheel_cache.outputs.cache-hit != 'true'
         run: |
           python3.12 tools/panda3d/patch_unix_build.py panda-source
           if [ "$RUNNER_OS" = "macOS" ]; then
@@ -70,6 +84,13 @@ jobs:
           cd panda-source
           python3.12 makepanda/makepanda.py --wheel --everything --optimize=3 --no-eigen \
             --no-nvidiacg --no-fmodex --no-openexr --threads=3
+
+      - name: Cache completed macOS wheel
+        if: runner.os == 'macOS' && steps.wheel_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: panda-source/*.whl
+          key: panda-mac-v1-${{ matrix.artifact }}-${{ steps.build_env.outputs.image }}-${{ hashFiles('tools/panda3d/patch_unix_build.py') }}
 
       - name: Check macOS architecture and deployment targets
         if: runner.os == 'macOS'

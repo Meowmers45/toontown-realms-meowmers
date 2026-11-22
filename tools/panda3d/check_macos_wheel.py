@@ -18,11 +18,12 @@ with ZipFile(wheel) as archive, TemporaryDirectory() as temp:
     for path in Path(temp).rglob('*'):
         if not path.is_file():
             continue
-        description = subprocess.check_output(['file', '-b', str(path)], text=True)
-        if 'Mach-O' not in description:
+        description = subprocess.check_output(['file', '-b', str(path)])
+        if b'Mach-O' not in description:
             continue
         subprocess.run(['lipo', str(path), '-verify_arch', arch], check=True)
-        commands = subprocess.check_output(['otool', '-arch', arch, '-l', str(path)], text=True)
+        commands = subprocess.check_output(['otool', '-arch', arch, '-l', str(path)],
+                                           text=True, errors='replace')
         minimums = re.findall(
             r'cmd LC_BUILD_VERSION\s+cmdsize \d+\s+platform (?:1|macos)\s+minos ([\d.]+)'
             r'|cmd LC_VERSION_MIN_MACOSX\s+cmdsize \d+\s+version ([\d.]+)',
