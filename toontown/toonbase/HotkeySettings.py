@@ -298,6 +298,21 @@ DebugCamera = HotkeySetting(
 )
 
 
+# == MARIO ==
+def _marioHotkey(name, default):
+    return HotkeySetting(f'Mario{name}', settingsFile=HotkeySettingsManager,
+                         category=SettingsCategory.HOTKEY_MARIO, default=default)
+
+
+MarioForward = _marioHotkey('Forward', 'arrow_up')
+MarioBackward = _marioHotkey('Backward', 'arrow_down')
+MarioLeft = _marioHotkey('Left', 'arrow_left')
+MarioRight = _marioHotkey('Right', 'arrow_right')
+MarioJump = _marioHotkey('Jump', 'j')
+MarioPunch = _marioHotkey('Punch', 'k')
+MarioCrouch = _marioHotkey('Crouch', 'l')
+
+
 def getAllHotkeys() -> List[HotkeySetting]:
     keys = []
     for item in list(globals().values()):

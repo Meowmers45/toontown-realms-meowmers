@@ -182,6 +182,9 @@ class SettingsScreen(DirectFrame, FSM):
             SettingsButton(self, TTLocalizer.ControlSettingsTitle,
                            text = TTLocalizer.SettingsKeyBinds,
                            command = self.__doKeymapSettings),
+            SettingsButton(self, TTLocalizer.MarioControlSettingsTitle,
+                           text = TTLocalizer.SettingsKeyBinds,
+                           command = self.__doKeymapSettings, extraArgs = [True]),
             SettingsButton(self, TTLocalizer.SettingsRetro,
                            text = TTLocalizer.SettingsChangeSettings,
                            command = lambda: self.request('Retro')),
@@ -741,13 +744,13 @@ class SettingsScreen(DirectFrame, FSM):
 
     ''' Keymap Functions '''
 
-    def __doKeymapSettings(self):
+    def __doKeymapSettings(self, mario = False):
         if self.controlSettings is None:
             self.controlSettings = ControlSettingsDialog.ControlSettingsDialog()
             self.controlSettings.load()
 
         self.accept(self.controlSettings.doneEvent, self.__doneKeymapSettings)
-        self.controlSettings.enter()
+        self.controlSettings.enter(inBook=self.inBook, mario=mario)
 
         # Move the settings screen and close button behind the fade screen to prevent interaction
         if not self.inBook:

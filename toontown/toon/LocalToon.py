@@ -85,6 +85,7 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
             self.LocalToon_initialized
         except:
             self.LocalToon_initialized = 1
+            self.marioMode = None
             self.numFlowers = 0
             self.maxFlowerBasket = 0
             DistributedToon.DistributedToon.__init__(self, cr)
@@ -370,7 +371,25 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
             self.nametag.manage(base.marginManager)
         DistributedToon.DistributedToon.announceGenerate(self)
 
+    def toggleMarioMode(self):
+        if self.marioMode is not None:
+            self.stopMarioMode()
+            return 'Mario mode off.'
+
+        from toontown.mario.MarioMode import MarioMode, MarioUnavailable
+        try:
+            self.marioMode = MarioMode(self)
+        except MarioUnavailable as exc:
+            return str(exc)
+        return 'Mario mode on. Change your keys in Settings > Game > Mario Controls.'
+
+    def stopMarioMode(self):
+        if self.marioMode is not None:
+            mode, self.marioMode = self.marioMode, None
+            mode.close()
+
     def disable(self):
+        self.stopMarioMode()
         self.laffMeter.destroy()
         del self.laffMeter
         self.questMap.destroy()
@@ -433,6 +452,7 @@ class LocalToon(DistributedToon.DistributedToon, LocalAvatar.LocalAvatar):
             self.LocalToon_deleted
         except:
             self.LocalToon_deleted = 1
+            self.stopMarioMode()
             Toon.unloadDialog()
             QuestParser.clear()
             DistributedToon.DistributedToon.delete(self)

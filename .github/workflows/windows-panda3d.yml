@@ -1,0 +1,60 @@
+name: Build Toontown Panda3D for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/windows-panda3d.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  wheel:
+    runs-on: windows-2022
+    steps:
+      - name: Check out the Panda3D fork
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Meowmers45/panda3d-ttoff-Meowmers
+          ref: 2d20af7f7f46a7cd316f6dc165f3dc0dc984372b
+          persist-credentials: false
+
+      - name: Install Panda3D build dependencies
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'panda3d-tools.zip'
+          curl.exe --fail --location --retry 3 -o $archive https://www.panda3d.org/download/panda3d-1.10.16/panda3d-1.10.16-tools-win64.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne 'c94d346ce486c65a4a251c72360155b7f4f4aa8e6fd702690b7a0aca8ed3616c') {
+            throw 'Panda3D third-party archive checksum mismatch.'
+          }
+          Expand-Archive -Path $archive -DestinationPath $env:RUNNER_TEMP
+          Move-Item (Join-Path $env:RUNNER_TEMP 'panda3d-1.10.16/thirdparty') ./
+
+      - name: Build the Python 3.12 x64 wheel
+        shell: pwsh
+        run: |
+          & ./thirdparty/win-python3.12-x64/python.exe makepanda/makepanda.py --wheel --everything --msvc-version=14.3 --windows-sdk=10 --arch=x64 --no-eigen --no-tinydisplay --no-openexr --no-squish --threads=4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+
+      - name: Verify Toontown extensions in the wheel
+        shell: pwsh
+        run: |
+          $wheel = Get-ChildItem -Path . -Filter '*.whl' | Select-Object -First 1
+          if (!$wheel) { throw 'Panda3D wheel was not produced.' }
+          python -m pip install $wheel.FullName
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -c "from panda3d.toontown import DNAStorage, Nametag; from direct import discord_rpc"
+
+      - name: Upload the verified wheel
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: panda3d-ttoff-windows-x64-cp312
+          path: '*.whl'
+          if-no-files-found: error
