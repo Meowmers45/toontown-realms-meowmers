@@ -7,6 +7,7 @@ from enum import IntEnum
 from typing import List, Type
 
 from otp.camera.CameraGlobals import CameraMode
+from otp.otpbase import OTPGlobals
 from otp.settings.TOMLSettings import TOMLSettings
 from toontown.social.SocialGlobals import ELoginPopupTypes, ETeleportRequestTypes
 from toontown.toonbase.SettingsBase import SettingsCategory, FloatSetting, BoolSetting, IntegerSetting, StringSetting, EnumSetting, ListSetting, SettingBase
@@ -311,6 +312,51 @@ MarioRight = _marioHotkey('Right', 'arrow_right')
 MarioJump = _marioHotkey('Jump', 'j')
 MarioPunch = _marioHotkey('Punch', 'k')
 MarioCrouch = _marioHotkey('Crouch', 'l')
+
+
+# Map the control dialog and arcade hints' legacy IDs to the live bindings.
+STANDARD_HOTKEYS = {
+    OTPGlobals.HotkeyMovement: {
+        OTPGlobals.HotkeyUp: MoveForward,
+        OTPGlobals.HotkeyDown: MoveBackward,
+        OTPGlobals.HotkeyLeft: MoveLeft,
+        OTPGlobals.HotkeyRight: MoveRight,
+        OTPGlobals.HotkeyJump: Jump,
+        OTPGlobals.HotkeyAction: Action,
+        OTPGlobals.HotkeyDescend: FlyDescend,
+    },
+    OTPGlobals.HotkeyInteraction: {
+        OTPGlobals.HotkeyBook: ToggleBook,
+        OTPGlobals.HotkeyBookSecondary: ExitActivity,
+        OTPGlobals.HotkeyTasks: PeekTasks,
+        OTPGlobals.HotkeyInventory: PeekInventory,
+        OTPGlobals.HotkeyFriends: ToggleSocialMenu,
+        OTPGlobals.HotkeyMap: ToggleMiniMap,
+        OTPGlobals.HotkeyMagicMenu: ToggleMagicMenu,
+        OTPGlobals.HotkeyScreenshot: TakeScreenshot,
+        OTPGlobals.HotkeyChat: Chat,
+        OTPGlobals.HotkeyInteract: Interact,
+    },
+    OTPGlobals.HotkeyDebug: {
+        OTPGlobals.HotkeyDebugInfo: ToggleDebugOverlay,
+        OTPGlobals.HotkeyFacilityDebug: DebugFacility,
+        OTPGlobals.HotkeyCameraDebug: DebugCamera,
+        OTPGlobals.HotkeyGarbage: DebugGarbageCollector,
+        OTPGlobals.HotkeySync: DebugSync,
+        OTPGlobals.HotkeyTaskMgr: ToggleTaskMgrOverlay,
+        OTPGlobals.HotkeyIval: ToggleIvalOverlay,
+    },
+    OTPGlobals.HotkeyMisc: {
+        OTPGlobals.HotkeyCameraForward: NextCameraView,
+        OTPGlobals.HotkeyCameraBackward: PreviousCameraView,
+        OTPGlobals.HotkeyCameraMode: CameraModeMenu,
+        OTPGlobals.HotkeyPageUp: ZoomIn,
+        OTPGlobals.HotkeyPageDown: ZoomOut,
+        OTPGlobals.HotkeyNametags: ToggleNametagVisibility,
+        OTPGlobals.HotkeyMargins: ToggleMarginVisibility,
+        OTPGlobals.HotkeyOobe: ToggleOobeCamera,
+    },
+}
 
 
 def getAllHotkeys() -> List[HotkeySetting]:

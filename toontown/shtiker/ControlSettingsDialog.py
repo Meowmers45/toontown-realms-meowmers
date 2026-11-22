@@ -12,11 +12,11 @@ from toontown.toonbase import ToontownGlobals
 from toontown.toontowngui import TTDialog
 from toontown.toontowngui.ToontownScrolledFrame import ToontownScrolledFrame
 
-MARIO_KEYS = (
+MARIO_KEYS = dict(enumerate((
     HotkeySettings.MarioForward, HotkeySettings.MarioBackward,
     HotkeySettings.MarioLeft, HotkeySettings.MarioRight,
     HotkeySettings.MarioJump, HotkeySettings.MarioPunch, HotkeySettings.MarioCrouch,
-)
+)))
 
 
 class ControlSettingsDialog(DirectFrame, StateData.StateData):
@@ -121,17 +121,8 @@ class ControlSettingsDialog(DirectFrame, StateData.StateData):
                 del button
             self.categoryButtons = []
 
-        if self.keyButtons:
-            for button in self.keyButtons:
-                label = button[3]
-                label.destroy()
-                del label
-                button = button[2]
-                button.destroy()
-                del button
-            self.keyButtons = []
-
-        self.controls = {}
+        categories = (MARIO_KEYS,) if self.mario else HotkeySettings.STANDARD_HOTKEYS.values()
+        self.controls = {setting: setting.get() for category in categories for setting in category.values()}
 
         guiButton = loader.loadModel('phase_3/models/gui/quit_button')
         buttonImage = (self.settingsButtonsModel.find('**/button_green_up'),
@@ -180,7 +171,6 @@ class ControlSettingsDialog(DirectFrame, StateData.StateData):
             base.transitions.noTransitions()
         if hasattr(base, 'localAvatar') and hasattr(base.localAvatar, 'chatMgr') and base.localAvatar.chatMgr:
             base.localAvatar.chatMgr.setBackgroundFocus(base.controlManager.getChatDisabled(), True)
-        self.__changeCategory(0)
         self.infoLabel['text'] = TTLocalizer.ControlSettingsInfoLabelDefault
         if self.button:
             self.button['state'] = DGG.NORMAL
@@ -222,35 +212,20 @@ class ControlSettingsDialog(DirectFrame, StateData.StateData):
             self._dialog = None
         base.transitions.fadeScreen(0.5)
 
-        if state == 1 and self.mario:
-            for key in MARIO_KEYS:
-                key.set(key.default)
-            base.controlManager.reloadHotkeys()
-            self.infoLabel['text'] = TTLocalizer.ControlSettingsResetApplied
-            self.generateHotkeyButtons()
-        elif state == 1:
-            hotkeys = ToontownGlobals.Hotkeys
-            for controlType in hotkeys:
-                controlIndex = hotkeys.index(controlType)
-                controlCategory = {}
-
-                controlDefaults = ToontownGlobals.AllHotkeys[controlIndex]
-                categoryNames = OTPLocalizer.HotkeyNames[controlIndex]
-                for key in controlDefaults.keys():
-                    default = controlDefaults.get(key)
-                    hotkeyName = categoryNames.get(key)
-                    if not hotkeyName:
-                        continue
-                    hotkeyName = hotkeyName.lower().replace(' ', '-')
-                    controlCategory[hotkeyName] = default
-
-                base.settings.updateSetting('keybinds', controlType, controlCategory)
-
+        if state == 1:
+            for setting in self.controls:
+                if setting.get() != setting.default:
+                    setting.set(setting.default)
             base.controlManager.reloadHotkeys()
             self.infoLabel['text'] = TTLocalizer.ControlSettingsResetApplied
             self.generateHotkeyButtons()
 
         self.show()
+
+    def __getHotkeys(self, index):
+        if self.mario:
+            return MARIO_KEYS
+        return HotkeySettings.STANDARD_HOTKEYS[ToontownGlobals.Hotkeys[index]]
 
     def __changeCategory(self, index):
         self.categoryButtons[self.category]['state'] = DGG.NORMAL
@@ -258,29 +233,22 @@ class ControlSettingsDialog(DirectFrame, StateData.StateData):
 
         self.category = index
 
+        for _, _, button, _ in self.keyButtons:
+            button.destroy()
         self.keyButtons = []
         self.hotkeysList.clearItems()
 
         buttonImage = (self.settingsButtonsModel.find('**/button_green_up'),
                        self.settingsButtonsModel.find('**/button_green_down'),
                        self.settingsButtonsModel.find('**/button_green_rollover'))
-        if self.mario:
-            hotkeys = range(len(MARIO_KEYS))
-            names = dict(enumerate(TTLocalizer.MarioControlSettingsKeys))
-            controlCategory = self.controls.setdefault('mario', {i: key.get() for i, key in enumerate(MARIO_KEYS)})
-        else:
-            hotkeys = ToontownGlobals.AllHotkeys[index].keys()
-            categoryName = ToontownGlobals.Hotkeys[index]
-            names = OTPLocalizer.HotkeyNames[index]
-            controlCategory = base.settings.getOption('keybinds', categoryName, {})
-            self.controls[categoryName] = controlCategory
+        names = (dict(enumerate(TTLocalizer.MarioControlSettingsKeys)) if self.mario
+                 else OTPLocalizer.HotkeyNames[index])
         btns = []
-        for hotkey in hotkeys:
+        for hotkey, setting in self.__getHotkeys(index).items():
             hotkeyName = names.get(hotkey)
             if not hotkeyName:
                 continue
-            setting = hotkey if self.mario else base.controlManager.parseHotkey(index, hotkey)
-            keyName = base.controlManager.getControlName(controlCategory.get(setting))
+            keyName = base.controlManager.getControlName(self.controls[setting])
             if keyName == ToontownGlobals.InvalidKey:
                 self.unknownKey = True
 
@@ -365,13 +333,16 @@ class ControlSettingsDialog(DirectFrame, StateData.StateData):
         if key in ('shift', 'control', 'alt'):
             self.queuedKey = None
 
+        setting = self.__getHotkeys(category)[hotkey]
+        activeHotkeys = {value for other, value in self.controls.items() if other is not setting}
+        # Mario can share Toon movement keys; the other Toon actions remain active.
+        ignoredCategories = set()
         if self.mario:
-            activeHotkeys = [value for i, value in self.controls['mario'].items() if i != hotkey]
-            activeHotkeys.extend(setting.get() for setting in HotkeySettings.getAllHotkeys()
-                                 if setting.category not in (HotkeySettings.SettingsCategory.HOTKEY_MARIO,
-                                                             HotkeySettings.SettingsCategory.HOTKEY_MOVEMENT))
-        else:
-            activeHotkeys = self.getActiveHotkeys()
+            ignoredCategories.add(HotkeySettings.SettingsCategory.HOTKEY_MOVEMENT)
+        elif setting.category == HotkeySettings.SettingsCategory.HOTKEY_MOVEMENT:
+            ignoredCategories.add(HotkeySettings.SettingsCategory.HOTKEY_MARIO)
+        activeHotkeys.update(other.get() for other in HotkeySettings.getAllHotkeys()
+                             if other not in self.controls and other.category not in ignoredCategories)
         if key in activeHotkeys or 'mouse' in key or 'wheel' in key:
             message = TTLocalizer.ControlSettingsAlreadyInUse
             if 'mouse' in key or 'wheel' in key:
@@ -386,16 +357,12 @@ class ControlSettingsDialog(DirectFrame, StateData.StateData):
             return
 
         self.__stopKeyCapture()
-        if self.mario:
-            self.controls['mario'][hotkey] = key
-        else:
-            categoryName = ToontownGlobals.Hotkeys[category]
-            self.controls[categoryName][base.controlManager.parseHotkey(category, hotkey)] = key
-
+        self.controls[setting] = key
         self.infoLabel['text'] = TTLocalizer.ControlSettingsSuccessful
 
         button['state'] = DGG.NORMAL
         button['text'] = base.controlManager.getControlName(key)
+        self.button = None
 
         if hasattr(self, '_dialog') and self._dialog:
             self._dialog.destroy()
@@ -404,23 +371,8 @@ class ControlSettingsDialog(DirectFrame, StateData.StateData):
         base.transitions.fadeScreen(0.5)
         self.show()
 
-    def getActiveHotkeys(self):
-        hotkeys = []
-        for category in self.controls.values():
-            for hotkey in category.values():
-                hotkeys.append(hotkey)
-        return hotkeys
-
     def applyChanges(self):
-        if self.mario:
-            for i, value in self.controls['mario'].items():
-                if MARIO_KEYS[i].get() != value:
-                    MARIO_KEYS[i].set(value)
-            base.controlManager.reloadHotkeys()
-            return
-
-        for category in self.controls.keys():
-            categoryInfo = self.controls.get(category)
-            base.settings.updateSetting('keybinds', category, categoryInfo)
-
+        for setting, value in self.controls.items():
+            if setting.get() != value:
+                setting.set(value)
         base.controlManager.reloadHotkeys()

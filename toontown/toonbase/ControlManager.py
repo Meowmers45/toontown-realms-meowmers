@@ -104,10 +104,11 @@ class ControlManager(DirectObject):
         return True
 
     def getKeyName(self, category: str, hotkey: int) -> str:
-        controlCategory: Dict = base.settings.getOption('keybinds', category, {})
-        categoryInd = ToontownGlobals.Hotkeys.index(category)
-        defaultDict = getattr(ToontownGlobals, 'Hotkey' + ToontownGlobals.Hotkeys[categoryInd].capitalize() + 'Defaults')
-        return controlCategory.get(base.controlManager.parseHotkey(category, hotkey), defaultDict[hotkey])
+        setting = HotkeySettings.STANDARD_HOTKEYS[category].get(hotkey)
+        if setting is not None:
+            return setting.get()
+        categoryIndex = ToontownGlobals.Hotkeys.index(category)
+        return ToontownGlobals.AllHotkeys[categoryIndex][hotkey]
 
     @staticmethod
     def getControlName(name, label=False):
