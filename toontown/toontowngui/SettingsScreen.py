@@ -168,9 +168,17 @@ class SettingsScreen(DirectFrame, FSM):
                                       verticalScroll_decButton_relief = None,
                                       verticalScroll_incButton_relief = None)
 
+        self.keymapButton = SettingsButton(self, TTLocalizer.ControlSettingsTitle,
+                                           text = TTLocalizer.SettingsKeyBinds,
+                                           command = self.__doKeymapSettings)
+        self.marioKeymapButton = SettingsButton(self, TTLocalizer.MarioControlSettingsTitle,
+                                                text = TTLocalizer.SettingsKeyBinds,
+                                                command = self.__doKeymapSettings, extraArgs = [True])
+
         self.gameOptions = [
             title,
             frame,
+            self.marioKeymapButton,
             ToggleOption(self, ClientSettings.AcceptingNewFriends),
             ToggleOption(self, ClientSettings.AcceptingNonFriendWhispers),
             ToggleOption(self, ClientSettings.GlobalChatPopups),
@@ -179,9 +187,7 @@ class SettingsScreen(DirectFrame, FSM):
             DropdownOption(self, ClientSettings.ScreenshotFormat),
             DropdownOption(self, ClientSettings.ChatFilterMode),
             ToggleOption(self, ClientSettings.SmoothThrowing),
-            SettingsButton(self, TTLocalizer.ControlSettingsTitle,
-                           text = TTLocalizer.SettingsKeyBinds,
-                           command = self.__doKeymapSettings),
+            self.keymapButton,
             SettingsButton(self, TTLocalizer.SettingsRetro,
                            text = TTLocalizer.SettingsChangeSettings,
                            command = lambda: self.request('Retro')),
@@ -741,13 +747,13 @@ class SettingsScreen(DirectFrame, FSM):
 
     ''' Keymap Functions '''
 
-    def __doKeymapSettings(self):
+    def __doKeymapSettings(self, mario = False):
         if self.controlSettings is None:
             self.controlSettings = ControlSettingsDialog.ControlSettingsDialog()
             self.controlSettings.load()
 
         self.accept(self.controlSettings.doneEvent, self.__doneKeymapSettings)
-        self.controlSettings.enter()
+        self.controlSettings.enter(inBook=self.inBook, mario=mario)
 
         # Move the settings screen and close button behind the fade screen to prevent interaction
         if not self.inBook:
@@ -755,7 +761,8 @@ class SettingsScreen(DirectFrame, FSM):
             # a2d is behind the fadeScreen
             self.bookCloseButton.reparentTo(base.a2dBottomRight)
         if ClientSettings.GUIAnimations.get():
-            startPos = self.gameOptions[7].getPos(aspect2d)
+            button = self.marioKeymapButton if mario else self.keymapButton
+            startPos = button.getPos(aspect2d)
 
             Parallel(
                     self.controlSettings.posInterval(0.2, Point3(0, 0, 0.1), startPos, blendType = 'easeOut'),

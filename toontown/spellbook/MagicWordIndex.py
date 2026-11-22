@@ -3287,6 +3287,18 @@ class SetTickets(MagicWord):
         return "%s's tickets were set to %s." % (toon.getName(), tixVal)
 
 
+class TransformMario(MagicWord):
+    aliases = ['mario']
+    desc = 'Toggle Mario mode for your local Toon.'
+    execLocation = MagicWordConfig.EXEC_LOC_CLIENT
+    affectRange = [MagicWordConfig.AFFECT_SELF]
+
+    def handleWord(self, invoker, avId, toon, *args):
+        if toon is not base.localAvatar:
+            return 'Mario mode is only available for your local Toon.'
+        return toon.toggleMarioMode()
+
+
 class TransformCog(MagicWord):
     aliases = ["setcogindex", "cogindex"]
     desc = "Transform the toon into a cog based on the cog shorthand."

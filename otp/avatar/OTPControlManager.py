@@ -16,6 +16,9 @@ class OTPControlManager(ControlManager.ControlManager):
         self.currentControls = None
         self.currentControlsName = None
         self.isEnabled = False
+        self.marioControls = False
+        self.wantStrafe = False
+        self.movementTokens = set()
         if enable:
             self.enable()
         self.forceAvJumpToken = None
@@ -29,115 +32,56 @@ class OTPControlManager(ControlManager.ControlManager):
 
         self.isEnabled = True
 
-        self.inputStateTokens['forward'] = inputState.watch(
-            "forward",
-            HotkeySettings.MoveForward.getPressed(),
-            HotkeySettings.MoveForward.getReleased(),
-            inputSource = 'OTPControls')
-        self.inputStateTokens['reverse'] = inputState.watch(
-            "reverse",
-            HotkeySettings.MoveBackward.getPressed(),
-            HotkeySettings.MoveBackward.getReleased(),
-            inputSource = 'OTPControls')
-
-        self.inputStateTokens['turnLeft'] = inputState.watch(
-            "turnLeft",
-            HotkeySettings.MoveLeft.getPressed(),
-            HotkeySettings.MoveLeft.getReleased(),
-            inputSource = 'OTPControls')
-        self.inputStateTokens['turnRight'] = inputState.watch(
-            "turnRight",
-            HotkeySettings.MoveRight.getPressed(),
-            HotkeySettings.MoveRight.getReleased(),
-            inputSource = 'OTPControls')
-
-        self.inputStateTokens['jump'] = inputState.watch(
-            "jump",
-            HotkeySettings.Jump.getPressed(),
-            HotkeySettings.Jump.getReleased(),
-            inputSource = 'OTPControls')
-
-        self.inputStateTokens['descend'] = inputState.watch(
-            'descend',
-            HotkeySettings.FlyDescend.getPressed(),
-            HotkeySettings.FlyDescend.getReleased(),
-            inputSource = 'OTPControls'
-        )
+        self.bindMovement()
 
         if self.currentControls:
             self.currentControls.enableAvatarControls()
 
-    def setStrafing(self, wantStrafe):
-        """
-        Toggles strafing
-        Changes whether the left and right keys should rotate or strafe
-        :type wantStrafe bool
-        """
-        if not self.isEnabled:
-            return
-        # Store the currently pressed state to seamlessly transition
-        turnLeftSet = inputState.isSet("turnLeft", inputSource = 'OTPControls')
-        turnRightSet = inputState.isSet("turnRight", inputSource = 'OTPControls')
-        slideLeftSet = inputState.isSet("slideLeft", inputSource = 'OTPControls')
-        slideRightSet = inputState.isSet("slideRight", inputSource = 'OTPControls')
-
-        # Release the current tokens
-        if 'turnLeft' in self.inputStateTokens:
-            self.inputStateTokens['turnLeft'].release()
-            del self.inputStateTokens['turnLeft']
-
-        if 'turnRight' in self.inputStateTokens:
-            self.inputStateTokens['turnRight'].release()
-            del self.inputStateTokens['turnRight']
-
-        if 'slideLeft' in self.inputStateTokens:
-            self.inputStateTokens['slideLeft'].release()
-            del self.inputStateTokens['slideLeft']
-
-        if 'slideRight' in self.inputStateTokens:
-            self.inputStateTokens['slideRight'].release()
-            del self.inputStateTokens['slideRight']
-
-        if wantStrafe:
-            self.inputStateTokens['slideLeft'] = inputState.watch(
-                "slideLeft",
-                HotkeySettings.MoveLeft.getPressed(),
-                HotkeySettings.MoveLeft.getReleased(),
-                inputSource = 'OTPControls')
-            self.inputStateTokens['slideRight'] = inputState.watch(
-                "slideRight",
-                HotkeySettings.MoveRight.getPressed(),
-                HotkeySettings.MoveRight.getReleased(),
-                inputSource = 'OTPControls')
-
-            # If we were turning when we switched to strafing, we can seamlessly transition that to
-            # strafing if we're still holding it down
-            inputState.set("slideLeft", turnLeftSet, inputSource = 'OTPControls')
-            inputState.set("slideRight", turnRightSet, inputSource = 'OTPControls')
-
-            # Stop the toon from turning
-            inputState.set("turnLeft", False, inputSource = 'OTPControls')
-            inputState.set("turnRight", False, inputSource = 'OTPControls')
-
+    def bindMovement(self):
+        keys = HotkeySettings
+        if self.marioControls:
+            settings = {'forward': keys.MarioForward, 'reverse': keys.MarioBackward,
+                        'jump': keys.MarioJump, 'descend': keys.MarioCrouch,
+                        'marioPunch': keys.MarioPunch}
+            left, right = keys.MarioLeft, keys.MarioRight
         else:
-            self.inputStateTokens['turnLeft'] = inputState.watch(
-                "turnLeft",
-                HotkeySettings.MoveLeft.getPressed(),
-                HotkeySettings.MoveLeft.getReleased(),
-                inputSource = 'OTPControls')
-            self.inputStateTokens['turnRight'] = inputState.watch(
-                "turnRight",
-                HotkeySettings.MoveRight.getPressed(),
-                HotkeySettings.MoveRight.getReleased(),
-                inputSource = 'OTPControls')
-            # If we were strafing when we switched to turning, we can seamlessly transition that to
-            # turning if we're still holding it down
-            inputState.set("turnLeft", slideLeftSet, inputSource = 'OTPControls')
-            inputState.set("turnRight", slideRightSet, inputSource = 'OTPControls')
+            settings = {'forward': keys.MoveForward, 'reverse': keys.MoveBackward,
+                        'jump': keys.Jump, 'descend': keys.FlyDescend}
+            left, right = keys.MoveLeft, keys.MoveRight
 
-            # Stop the toon from strafing
-            inputState.set("slideLeft", False, inputSource = 'OTPControls')
-            inputState.set("slideRight", False, inputSource = 'OTPControls')
+        turn, slide = ('slide', 'turn') if self.wantStrafe else ('turn', 'slide')
+        held = {side: inputState.isSet(turn + side, inputSource='OTPControls')
+                      or inputState.isSet(slide + side, inputSource='OTPControls')
+                for side in ('Left', 'Right')}
+        for name, setting in ((turn + 'Left', left), (turn + 'Right', right)):
+            settings[name] = setting
+
+        for name in self.movementTokens - settings.keys():
+            self.releaseToken(name)
+            inputState.set(name, False, inputSource='OTPControls')
+
+        for name, setting in settings.items():
+            if name not in self.inputStateTokens:
+                self.inputStateTokens[name] = inputState.watch(
+                    name, setting.getPressed(), setting.getReleased(),
+                    startState=held.get(name[len(turn):], False), inputSource='OTPControls')
+        self.movementTokens = set(settings)
+
+    def setMarioControls(self, enabled):
+        if self.marioControls == enabled:
+            return
+        self.marioControls = enabled
+        if self.isEnabled:
+            for name in self.movementTokens:
+                self.releaseToken(name)
+                inputState.set(name, False, inputSource='OTPControls')
+            self.movementTokens.clear()
+            self.bindMovement()
+
+    def setStrafing(self, wantStrafe):
+        self.wantStrafe = wantStrafe
+        if self.isEnabled:
+            self.bindMovement()
 
     def addToken(self, tokenName, token):
         self.inputStateTokens[tokenName] = token
@@ -157,6 +101,7 @@ class OTPControlManager(ControlManager.ControlManager):
         for token in list(self.inputStateTokens.values()):
             token.release()
         self.inputStateTokens: Dict[str, InputStateToken] = {}
+        self.movementTokens.clear()
 
         if self.currentControls:
             self.currentControls.disableAvatarControls()

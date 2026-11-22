@@ -8200,6 +8200,9 @@ ExtraOptionsPageSfxVolumeLabel = 'Sound Effects Volume'
 ExtraOptionsPageTextToSpeechVolumeLabel = 'Text to Speech Volume'
 ExtraOptionsPageControlSettings = 'Controls'
 ControlSettingsTitle = 'Control Settings'
+MarioControlSettingsTitle = 'Mario Controls'
+MarioControlSettingsKeys = ('Run Forward', 'Walk Backward', 'Turn Left', 'Turn Right',
+                            'Jump', 'Punch', 'Crouch')
 ControlSettingsInfoLabelDefault = 'Change your input settings here.'
 ControlSettingsInfoLabelChangeKey = 'Press a key combination to create your new hotkey.'
 ControlSettingsAlreadyInUse = 'That key combination is already in use. Please choose another.'
